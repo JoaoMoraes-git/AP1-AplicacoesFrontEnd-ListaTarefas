@@ -37,10 +37,13 @@ const apiUserIdInput = document.getElementById("api-user-id");
 const apiFeedback = document.getElementById("api-feedback");
 const statusMessage = document.getElementById("status-message");
 const reloadButton = document.getElementById("reload-button");
-const apiSubmitButton = apiForm.querySelector('button[type="submit]"');
+const apiSubmitButton = apiForm.querySelector('button[type="submit"]');
 
 const list = document.getElementById("study-list");
-const empetyState = document.getElementById("empty-state");
+const emptyState = document.getElementById("empty-state");
+
+//Verificando se as tags foram capturadas corretamente
+console.log({ form, apiForm, list, emptyState });
 
 
 
@@ -136,11 +139,11 @@ function renderList(){
     list.replaceChildren();
 
     if(items.length === 0){
-        empetyState.hidden = false;
-        renderList;
+        emptyState.hidden = false;
+        return;
     }
 
-    empetyState.hidden = true;
+    emptyState.hidden = true;
 
     items.forEach((item) =>{
         list.appendChild(createStudyItem(item));
@@ -167,17 +170,20 @@ function handleFormSubmit(event){
 
     if(errorMessage){
         setFeedback(errorMessage, "error");
+        return;
     }
 
     items.unshift({
         id: nextId,
-        title
+        title,
+        source : "manual",
+        completed: false
     });
 
     nextId++;
     form.reset();
     input.focus();
-    setFeedback("Item adicionado com sucesso", "sucess");
+    setFeedback("Item adicionado com sucesso", "success");
     renderList();
 }
 
@@ -209,7 +215,7 @@ function handleListClick(event){
 
     const removeTitle = items[index].title;
     items.splice(index, 1);
-    setFeedback(`Item removido: ${removeTitle} .`, "sucess");
+    setFeedback(`Item removido: ${removeTitle} .`, "success");
     renderList();
 }
 
@@ -225,4 +231,63 @@ input.addEventListener("input", () =>{
 });
 
 renderList();
+
+async function handleApiSubmit(event) {
+    event.preventDefault();
+
+    const userId = apiUserIdInput.value.trim();
+
+    lastUserId = userId;
+
+    setApiLoading(true);
+    setApiFeedback("Carregando sugestões da API...");
+
+    try {
+        let url = "https://jsonplaceholder.typicode.com/todos";
+        if (userId !== "") {
+            url += `?userId=${userId}`;
+        }
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error("Aconteceu um erro na requisição")
+    };
+
+    const data = await response.json();
+
+    const limitedData = data.slice(0, 5);
+
+    limitedData.forEach((task) => {
+        items.unshift({
+            id: nextId,
+            title: task.title,
+            source: "api",
+            userId: task.userId,
+            completed: task.completed
+        });
+        nextId++;
+    });
+
+    renderList();
+
+    setApiFeedback(`${limitedData.length} sugestões encontrados!`, "success");
+
+
+    } catch (error) {
+        setApiFeedback("Erro ao carregar dados da API.", "error");
+    } finally {
+        setApiLoading(false);
+        apiForm.reset();
+    }
+}
+
+apiForm.addEventListener("submit", handleApiSubmit);
+
+reloadButton.addEventListener("click", (event) => {
+
+    apiUserIdInput.value = lastUserId;
+
+    handleApiSubmit(event);
+})
 
